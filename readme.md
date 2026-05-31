@@ -1,11 +1,93 @@
-# TimerTrigger - C<span>#</span>
+## License
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
-The `TimerTrigger` makes it incredibly easy to have your functions executed on a schedule. This sample demonstrates a simple use case of calling your function every 5 minutes.
+# DeadlockMonitorIso  
+Azure Function (.NET 10, Isolated Worker) for scheduled SQL Server monitoring
 
-## How it works
+## Overview
+DeadlockMonitorIso is an Azure Function running in the **.NET Isolated Worker model**.  
+It executes on a **TimerTrigger** (every 1 minute) and connects to SQL Server using the modern  
+`Microsoft.Data.SqlClient` provider.
 
-For a `TimerTrigger` to work, you provide a schedule in the form of a [cron expression](https://en.wikipedia.org/wiki/Cron#CRON_expression)(See the link for full details). A cron expression is a string with 6 separate expressions which represent a given schedule via patterns. The pattern we use to represent every 5 minutes is `0 */5 * * * *`. This, in plain text, means: "When seconds is equal to 0, minutes is divisible by 5, for any hour, day of the month, month, day of the week, or year".
+The function is designed as the foundation for a future **deadlock collector**, which will execute a stored procedure that captures and logs SQL Server deadlock graphs.
 
-## Learn more
+This repository contains:
+- A working isolated worker Azure Function
+- TimerTrigger firing every minute
+- SQL connectivity using `Microsoft.Data.SqlClient`
+- Console logging enabled for local development
+- Azurite support for local Azure Storage emulation
+- A clean GitHub setup with `.gitignore`
 
-<TODO> Documentation
+---
+
+## Features
+- ✔ .NET 10 isolated worker runtime  
+- ✔ TimerTrigger (`0 */1 * * * *`)  
+- ✔ SQL Server connectivity  
+- ✔ Console logging (via `Microsoft.Extensions.Logging.Console`)  
+- ✔ OpenTelemetry + Azure Monitor exporter  
+- ✔ Local development with Azurite  
+- ✔ Ready for extension into a deadlock monitoring system  
+
+---
+
+## Requirements
+
+### Install:
+- **.NET 10 SDK**  
+- **Azure Functions Core Tools** (`funx64.msi`)  
+- **Azurite** (via npm)  
+- **SQL Server** (local or remote)
+
+### NuGet packages:
+- `Microsoft.Data.SqlClient`  
+- `Microsoft.Extensions.Logging.Console`  
+
+---
+
+## Local Development
+
+### 1. Start Azurite
+```bash
+azurite
+
+------------
++-------------------------------------------------------------+
+|                     DeadlockMonitorIso                      |
+|                 Azure Function (Isolated)                   |
++-------------------------------------------------------------+
+                | TimerTrigger (every 1 min)
+                v
++-------------------------------------------------------------+
+|                    DeadlockTimer Function                   |
+|  - Logs start                                               |
+|  - Opens SQL connection (Microsoft.Data.SqlClient)          |
+|  - Executes SQL command / stored procedure                  |
+|  - Logs result                                              |
++-------------------------------------------------------------+
+                |
+                v
++-------------------------------------------------------------+
+|                        SQL Server                           |
+|  - AdventureWorks2025 (example)                             |
+|  - Future: Deadlock collector stored procedure              |
++-------------------------------------------------------------+
+
+                Logging Pipeline
+                ----------------
+                Console Logger  --->  Visible in func start
+                OpenTelemetry   --->  Azure Monitor exporter
+
+
+--------
+DeadlockMonitorIso/
+│
+├── DeadlockMonitorIso.csproj
+├── Program.cs
+├── DeadlockTimer.cs
+├── local.settings.json
+├── .gitignore
+├── README.md
+└── HowTo.md
+
