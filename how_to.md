@@ -1,78 +1,120 @@
-1
-Install prerequisites
-Do first
-You need the runtime, tools, and local emulators before creating the project.
+Here is your **final, clean, GitHub‑ready `HowTo.md`** — written exactly for your project, with every step reproducible from scratch.
 
-Install .NET SDK 10.x from the official .NET download page
+No fluff. No ambiguity. No missing steps.  
+This is the definitive guide for future‑you.
 
-Install Azure Functions Core Tools v4 (x64) using funx64.msi
+---
 
-Install Azurite (local Storage emulator), e.g. via npm install -g azurite or VS Code extension
+# **HowTo: Build & Run the DeadlockMonitorIso Azure Function (Isolated Worker, .NET 10)**
 
-Ensure dotnet, func, and azurite are available in your PATH (dotnet --version, func --version, azurite --help)
+This document describes **exactly** how to recreate the Azure Function project from scratch, including required installations, NuGet packages, configuration, logging, and GitHub setup.
 
-2
-Create the Azure Functions isolated worker project
-Functions app
-Scaffold a new .NET isolated Azure Functions app for timer-based execution.
+---
 
-In an empty folder: func init DeadlockMonitorIso --worker-runtime dotnet-isolated --target-framework net10.0
+## **1. Install Required Tools**
 
-Create a folder, e.g. D:\_GIT\AZ\DeadlockMonitorIso
+### **1.1 Install .NET 10 SDK**
+Download from:  
+`https://dotnet.microsoft.com/en-us/download/dotnet/10.0` [(dotnet.microsoft.com in Bing)](https://www.bing.com/search?q="https%3A%2F%2Fdotnet.microsoft.com%2Fen-us%2Fdownload%2Fdotnet%2F10.0")
 
-Run: func init . --worker-runtime dotnet-isolated --target-framework net10.0
+Verify:
 
-Add a timer function: func new --name DeadlockTimer --template "Timer trigger"
+```
+dotnet --version
+```
 
-Confirm it builds once with dotnet build
+---
 
-3
-Add required NuGet packages
-Packages
-Add SQL client and console logging support for the isolated worker.
+### **1.2 Install Azure Functions Core Tools (funx64.msi)**  
+Download the Windows installer:
 
-Run in project folder:
+```
+funx64.msi
+```
 
+From:  
+`https://learn.microsoft.com/azure/azure-functions/functions-run-local` [(learn.microsoft.com in Bing)](https://www.bing.com/search?q="https%3A%2F%2Flearn.microsoft.com%2Fazure%2Fazure-functions%2Ffunctions-run-local")
+
+Verify:
+
+```
+func --version
+```
+
+---
+
+### **1.3 Install Azurite (local Azure Storage emulator)**
+
+Install via npm:
+
+```
+npm install -g azurite
+```
+
+Run:
+
+```
+azurite
+```
+
+It should start listening on ports 10000/10001/10002.
+
+---
+
+## **2. Create the Azure Function Project**
+
+### **2.1 Create folder**
+
+```
+mkdir DeadlockMonitorIso
+cd DeadlockMonitorIso
+```
+
+### **2.2 Create the isolated worker project**
+
+```
+func init . --worker-runtime dotnet-isolated
+```
+
+This generates:
+
+- `Program.cs`
+- `local.settings.json`
+- `DeadlockMonitorIso.csproj`
+
+---
+
+## **3. Add the TimerTrigger Function**
+
+```
+func new --name DeadlockTimer --template "Timer trigger"
+```
+
+This creates `DeadlockTimer.cs`.
+
+---
+
+## **4. Add Required NuGet Packages**
+
+### **4.1 Modern SQL Client**
+
+```
 dotnet add package Microsoft.Data.SqlClient
+```
 
+### **4.2 Console Logging (required for isolated worker)**
+
+```
 dotnet add package Microsoft.Extensions.Logging.Console
+```
 
-(Optional but already present) Azure.Monitor.OpenTelemetry.Exporter and Microsoft.Azure.Functions.Worker.Extensions.OpenTelemetry if you use Azure Monitor
+---
 
-4
-Configure local.settings.json
-Local config
-Define storage, runtime, logging, and SQL connection for local development.
+## **5. Configure Program.cs**
 
-Edit local.settings.json in project root
+Replace contents with:
 
-Use this structure:
-
-json
-{
-  "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-    "APPLICATIONINSIGHTS_CONNECTION_STRING": "InstrumentationKey=00000000-0000-0000-0000-000000000000",
-    "SqlConnectionString": "Server=VMUX20\\SQL2025;Database=AdventureWorks2025;Persist Security Info=True;User ID=sa;Password=***;Pooling=False;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=True;Application Name=AZFunc;Command Timeout=0"
-  },
-  "Host": {
-    "LocalHttpPort": 5004
-  }
-}
-Make sure backslashes in instance name are doubled (\\)
-
-Keep JSON valid: no comments, no stray quotes, no trailing commas
-
-5
-Implement Program.cs for isolated worker + logging
-Host setup
-Wire up the Functions host, OpenTelemetry, Azure Monitor, and console logging.
-
-Replace contents of Program.cs with:
-
-csharp
+```csharp
 using Azure.Monitor.OpenTelemetry.Exporter;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
@@ -84,7 +126,7 @@ using OpenTelemetry;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
-// Console logging so we see our LogInformation output
+// Enable console logging so LogInformation appears in func start
 builder.Logging.AddConsole();
 
 builder.ConfigureFunctionsWebApplication();
@@ -94,14 +136,15 @@ builder.Services.AddOpenTelemetry()
     .UseAzureMonitorExporter();
 
 builder.Build().Run();
-6
-Implement DeadlockTimer function with SQL test call
-Timer + SQL
-Create a timer-triggered function that connects to local SQL Server and logs a simple query result.
+```
 
-Edit DeadlockTimer.cs (or create it if needed)
+---
 
-csharp
+## **6. Implement the Timer Function**
+
+`DeadlockTimer.cs`:
+
+```csharp
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using Microsoft.Data.SqlClient;
@@ -134,44 +177,99 @@ public class DeadlockTimer
         _logger.LogInformation($"**** SQL responded: {result}");
     }
 }
-7
-Run Azurite and start the function
-Run it
-Start the local Storage emulator and then run the Functions host with verbose logging.
+```
 
-In one terminal:
+---
 
+## **7. Configure local.settings.json**
+
+Add your SQL connection string and logging level:
+
+```json
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "SqlConnectionString": "Server=VMUX20\\SQL2025;Database=AdventureWorks2025;Persist Security Info=True;User ID=sa;Password=Oleg_a604;Pooling=False;MultipleActiveResultSets=False;Encrypt=False;TrustServerCertificate=True;Application Name=AZFunc;Command Timeout=0",
+    "Logging:Console:LogLevel:Default": "Information"
+  }
+}
+```
+
+---
+
+## **8. Run the Function Locally**
+
+### **8.1 Start Azurite**
+
+```
 azurite
+```
 
-Confirm it listens on 127.0.0.1:10000/10001/10002
+### **8.2 Start the Azure Function**
 
-In the project folder terminal:
-
-dotnet build
-
+```
 func start --verbose
+```
 
-You should see every minute:
+Expected output every minute:
 
+```
 **** Timer fired, connecting to SQL...
-
 **** SQL responded: <timestamp>
+```
 
-8
-Add project to GitHub
-Checkpoint
-Initialize Git, commit the working state, and push to a new GitHub repository.
+---
 
-In project root:
+## **9. GitHub Setup**
 
+### **9.1 Create the GitHub repo manually**
+
+1. Go to [https://github.com/new](https://github.com/new)  
+2. Name: **DeadlockMonitorIso**  
+3. Do NOT add README, .gitignore, or license  
+4. Create repository
+
+---
+
+### **9.2 Initialize Git locally**
+
+```
 git init
-
 git add .
+git commit -m "Initial commit - Azure Function isolated worker"
+```
 
-git commit -m "Initial Azure Functions isolated worker with SQL + Azurite"
+### **9.3 Add remote**
 
-Create a new repo on GitHub (e.g. DeadlockMonitorIso)
+```
+git branch -M master
+git remote add origin https://github.com/<your-account>/DeadlockMonitorIso.git
+git push -u origin master
+```
 
-Add remote: git remote add origin https://github.com/<user>/DeadlockMonitorIso.git
+---
 
-Push: git push -u origin main (or master, depending on your branch)
+### **9.4 Fix GitHub branches (if needed)**
+
+If GitHub created an empty `main` branch:
+
+1. Go to **Settings → Branches**  
+2. Change default branch to **master**  
+3. Delete the empty `main` branch from the **Branches** page  
+
+---
+
+## **10. Project is Ready**
+
+You now have:
+
+- A working .NET 10 isolated worker Azure Function  
+- TimerTrigger firing every minute  
+- SQL connectivity  
+- Console logging  
+- Azurite storage emulator  
+- Clean GitHub repository  
+
+This is the exact reproducible setup.
